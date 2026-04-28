@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "declaration": true,
+    "target": "ESNext",
+    "module": "CommonJS", // Node.jsで動かすため
+    "outDir": "./dist", // ビルド先の指定
+    "rootDir": "./src", // ソースコードの場所
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "dist/index.d.ts", "example/example.ts"],
+  "exclude": ["node_modules", "example", "dist"]
+}
