@@ -27,10 +27,7 @@ export class Stdin {
    * @param prompt プロンプト
    * @param parser 変換関数 (Number など)
    */
-  static inputs<T = string>(
-    prompt: string = "",
-    parser?: (v: string) => T,
-  ): T[] {
+  static inputs<T = string>(prompt: string, parser?: (v: string) => T): T[] {
     const raw = this.read(prompt);
     // スペースで分割し、空文字を除去
     const items = raw.split(/\,|\;|\t|\||\s+/).filter((v) => v.length > 0);
@@ -40,7 +37,7 @@ export class Stdin {
   }
 
   static streamReads(
-    prompt = "",
+    prompt: string,
     end: (line: string, index: number) => boolean = (line) => line === "",
   ): string[] {
     process.stdout.write(prompt);
@@ -61,7 +58,7 @@ export class Stdin {
   }
 
   static streamReadText(
-    prompt = "",
+    prompt: string,
     end: (line: string, index: number) => boolean = (line) => line === "",
   ): string {
     return this.streamReads(prompt, end).join("\n");
