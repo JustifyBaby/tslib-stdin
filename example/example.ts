@@ -59,12 +59,9 @@ const custom = Stdin.object(
 );
 console.log(`Your age is: ${custom.age}`);
 
-const multiLine = Stdin.streamReads("enter script", (line) => line === "\n\n");
+const multiLine = Stdin.streamReads("enter script >> ");
 console.log(multiLine);
 
-const multiLineText = Stdin.streamReadText(
-  "enter script",
-  (line) => line === "\n\n",
-);
+const multiLineText = Stdin.streamReadText("enter script >> ");
 
 console.log(multiLineText);
