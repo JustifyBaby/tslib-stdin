@@ -39,6 +39,34 @@ export class Stdin {
     return items.map(parser);
   }
 
+  static streamReads(
+    prompt = "",
+    end: (line: string, index: number) => boolean = (line) => line === "",
+  ): string[] {
+    process.stdout.write(prompt);
+
+    const lines: string[] = [];
+    let index = 0;
+
+    while (true) {
+      const line = this.read("");
+
+      if (end(line, index)) break;
+
+      lines.push(line);
+      index++;
+    }
+
+    return lines;
+  }
+
+  static streamReadText(
+    prompt = "",
+    end: (line: string, index: number) => boolean = (line) => line === "",
+  ): string {
+    return this.streamReads(prompt, end).join("\n");
+  }
+
   /**
    * オブジェクト形式での一括入力
    */
