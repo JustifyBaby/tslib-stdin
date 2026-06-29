@@ -10,7 +10,9 @@ export declare class Stdin {
      * @param prompt プロンプト
      * @param parser 変換関数 (Number など)
      */
-    static inputs<T = string>(prompt?: string, parser?: (v: string) => T): T[];
+    static inputs<T = string>(prompt: string, parser?: (v: string) => T): T[];
+    static streamReads(prompt: string, end?: (line: string, index: number) => boolean): string[];
+    static streamReadText(prompt: string, end?: (line: string, index: number) => boolean): string;
     /**
      * オブジェクト形式での一括入力
      */

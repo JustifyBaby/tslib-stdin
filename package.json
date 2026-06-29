@@ -1,12 +1,19 @@
 {
   "name": "tslib-stdin",
-  "version": "2.0.2",
+  "version": "2.0.4",
   "description": "",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
   "license": "MIT",
   "publishConfig": {
     "access": "public"

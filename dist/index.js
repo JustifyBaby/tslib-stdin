@@ -55,13 +55,29 @@ class Stdin {
      * @param prompt プロンプト
      * @param parser 変換関数 (Number など)
      */
-    static inputs(prompt = "", parser) {
+    static inputs(prompt, parser) {
         const raw = this.read(prompt);
         // スペースで分割し、空文字を除去
         const items = raw.split(/\,|\;|\t|\||\s+/).filter((v) => v.length > 0);
         if (!parser)
             return items;
         return items.map(parser);
+    }
+    static streamReads(prompt, end = (line) => line === "") {
+        process.stdout.write(prompt);
+        const lines = [];
+        let index = 0;
+        while (true) {
+            const line = this.read("");
+            if (end(line, index))
+                break;
+            lines.push(line);
+            index++;
+        }
+        return lines;
+    }
+    static streamReadText(prompt, end = (line) => line === "") {
+        return this.streamReads(prompt, end).join("\n");
     }
     /**
      * オブジェクト形式での一括入力
