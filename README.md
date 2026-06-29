@@ -70,6 +70,32 @@ console.log(user.id); // number
 console.log(user.rank); // "Lv1" | "Lv2" | "Lv3"
 ```
 
+### 4. Multi-line Input
+
+Read multiple lines until an empty line is entered.
+
+```typescript
+const lines = Stdin.streamReads("Enter text (empty line to finish): ");
+
+console.log(lines);
+// ["Hello", "World", "TypeScript"]
+```
+
+### 5. Multi-line Text
+
+Read multiple lines and return them as a single string.
+
+```typescript
+const text = Stdin.streamReadText("Enter text (empty line to finish): ");
+
+console.log(text);
+/*
+Hello
+World
+TypeScript
+*/
+```
+
 ---
 
 ## API Reference
@@ -93,6 +119,21 @@ Collects multiple inputs based on the `schema`.
 - **rule**: `{ key: TransformFunc }`. Must match the keys in `schema`.
 - **promptFunc**: Optional. Customize how the prompt is displayed.
   - Default: `(key) => `${key}: ` `
+
+### `Stdin.streamReads(prompt?: string): string[]`
+
+Reads multiple lines from `stdin`.
+
+- Returns each line as an element of a `string[]`.
+- Input ends when an empty line is entered.
+
+### `Stdin.streamReadText(prompt?: string): string`
+
+Reads multiple lines from `stdin`.
+
+- Returns all input as a single `string`.
+- Lines are joined using `\n`.
+- Input ends when an empty line is entered.
 
 ---
 

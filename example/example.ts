@@ -58,3 +58,5 @@ const custom = Stdin.object(
   (label) => `>>> Please enter ${label}: `,
 );
 console.log(`Your age is: ${custom.age}`);
+
+const multiLine = Stdin.streamReads("enter script", (line) => line === "\n\n");

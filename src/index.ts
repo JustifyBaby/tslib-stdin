@@ -27,7 +27,10 @@ export class Stdin {
    * @param prompt プロンプト
    * @param parser 変換関数 (Number など)
    */
-  static inputs<T = string>(prompt: string, parser?: (v: string) => T): T[] {
+  public static inputs<T = string>(
+    prompt: string,
+    parser?: (v: string) => T,
+  ): T[] {
     const raw = this.read(prompt);
     // スペースで分割し、空文字を除去
     const items = raw.split(/\,|\;|\t|\||\s+/).filter((v) => v.length > 0);
@@ -36,7 +39,7 @@ export class Stdin {
     return items.map(parser);
   }
 
-  static streamReads(
+  public static streamReads(
     prompt: string,
     end: (line: string, index: number) => boolean = (line) => line === "",
   ): string[] {
@@ -57,7 +60,7 @@ export class Stdin {
     return lines;
   }
 
-  static streamReadText(
+  public static streamReadText(
     prompt: string,
     end: (line: string, index: number) => boolean = (line) => line === "",
   ): string {
@@ -67,7 +70,7 @@ export class Stdin {
   /**
    * オブジェクト形式での一括入力
    */
-  static object<
+  public static object<
     S extends Record<string, string>,
     R extends { [K in keyof S]: TransformFunc }, // ここで関数以外を弾く
   >(
