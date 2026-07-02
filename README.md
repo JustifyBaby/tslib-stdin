@@ -171,6 +171,7 @@ import { z } from "zod";
 const result = Stdin.objectWithZod(
   z.object({
     age: z.coerce.number().int().min(0),
+    // Not string type need to coerce or transform
     name: z.string().min(1),
   }),
   {
@@ -183,6 +184,9 @@ if (result.success) {
   console.log(result.data.age);
 }
 ```
+
+**notice**
+_Not string type need to coerce or transform_
 
 ---
 
