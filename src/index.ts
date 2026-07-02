@@ -1,21 +1,63 @@
 import * as fs from "fs";
+import { StringDecoder } from "string_decoder";
 import { z } from "zod";
 
 type PromptFunc = (key: string) => string;
-type TransformFunc<T = any> = (val: string) => T;
+type TransformFunc<T = unknown> = (val: string) => T;
+type SchemaFor<L extends Record<string, string>> = {
+  [K in keyof L]: TransformFunc;
+};
+type ObjectResult<
+  L extends Record<string, string>,
+  S extends SchemaFor<L>,
+> = {
+  [K in keyof L]: ReturnType<S[K]>;
+};
 
 export class Stdin {
+  private static readonly READ_BUFFER_SIZE = 1024;
+  private static pendingInput = "";
+
+  private static takePendingLine(): string | undefined {
+    const newlineIndex = this.pendingInput.indexOf("\n");
+    if (newlineIndex === -1) return undefined;
+
+    const line = this.pendingInput.slice(0, newlineIndex).replace(/\r$/, "");
+    this.pendingInput = this.pendingInput.slice(newlineIndex + 1);
+    return line;
+  }
+
+  private static readLine(): string {
+    const decoder = new StringDecoder("utf8");
+
+    while (true) {
+      const pendingLine = this.takePendingLine();
+      if (pendingLine !== undefined) return pendingLine;
+
+      const buffer = Buffer.alloc(this.READ_BUFFER_SIZE);
+      const bytesRead = fs.readSync(
+        0,
+        buffer,
+        0,
+        this.READ_BUFFER_SIZE,
+        null,
+      );
+
+      if (bytesRead === 0) {
+        const rest = this.pendingInput + decoder.end();
+        this.pendingInput = "";
+        return rest.replace(/\r$/, "");
+      }
+
+      this.pendingInput += decoder.write(buffer.subarray(0, bytesRead));
+    }
+  }
+
   /** * 1行読み込みのコアロジック
    */
   private static read(prompt: string): string {
     process.stdout.write(prompt);
-    const BUF_SIZE = 1024;
-    const buffer = Buffer.alloc(BUF_SIZE);
-
-    const bytesRead = fs.readSync(0, buffer, 0, BUF_SIZE, null);
-
-    // 改行を消して文字列を返す
-    return buffer.toString("utf8", 0, bytesRead).replace(/\r?\n$/, "");
+    return this.readLine();
   }
 
   public static input(prompt: string): string {
@@ -33,7 +75,7 @@ export class Stdin {
   ): T[] {
     const raw = this.read(prompt);
     // スペースで分割し、空文字を除去
-    const items = raw.split(/\,|\;|\t|\||\s+/).filter((v) => v.length > 0);
+    const items = raw.split(/[,;\t|\s]+/).filter((v) => v.length > 0);
 
     if (!parser) return items as unknown as T[];
     return items.map(parser);
@@ -49,7 +91,7 @@ export class Stdin {
     let index = 0;
 
     while (true) {
-      const line = this.read("");
+      const line = this.readLine();
       if (end(line, index)) break;
       lines.push(line);
       index++;
@@ -65,45 +107,54 @@ export class Stdin {
     return this.streamReads(prompt, end).join("\n");
   }
 
-  public static object<
-    L extends Record<string, string>,
-    S extends { [K in keyof L]: TransformFunc }, // ここで関数以外を弾く
-  >(
+  public static object<L extends Record<string, string>>(
     label: L,
-    schema?: S,
+    schema?: undefined,
     prompt?: PromptFunc,
-  ): { [K in keyof S]: ReturnType<S[K]> };
+  ): { [K in keyof L]: string };
 
-  public static object<
-    L extends Record<string, string>,
-    S extends { [K in keyof L]: TransformFunc }, // ここで関数以外を弾く
-  >(
+  public static object<L extends Record<string, string>>(
     label: L,
-    schema?: S,
+    schema?: undefined,
     prompt?: PromptFunc,
     isStream?: boolean,
     streamEnd?: (line: string, index: number) => boolean,
-  ): { [K in keyof L]: ReturnType<S[K]> };
+  ): { [K in keyof L]: string };
+
+  public static object<
+    L extends Record<string, string>,
+    S extends SchemaFor<L>,
+  >(label: L, schema: S, prompt?: PromptFunc): ObjectResult<L, S>;
+
+  public static object<
+    L extends Record<string, string>,
+    S extends SchemaFor<L>,
+  >(
+    label: L,
+    schema: S,
+    prompt?: PromptFunc,
+    isStream?: boolean,
+    streamEnd?: (line: string, index: number) => boolean,
+  ): ObjectResult<L, S>;
 
   /**
    * オブジェクト形式での一括入力
    */
   public static object<
     L extends Record<string, string>,
-    S extends { [K in keyof L]: TransformFunc }, // ここで関数以外を弾く
+    S extends SchemaFor<L>,
   >(
     label: L,
     schema?: S,
     prompt: PromptFunc = (key) => `${key}: `,
     isStream: boolean = false,
     streamEnd: (line: string, index: number) => boolean = (line) => line === "",
-  ): { [K in keyof L]: ReturnType<S[K]> } {
-    // 戻り値は関数の戻り値型に固定
+  ): { [K in keyof L]: string | ReturnType<S[keyof S]> } {
+    const result: Partial<{ [K in keyof L]: string | ReturnType<S[keyof S]> }> =
+      {};
 
-    const result = {} as any;
-
-    for (const key in label) {
-      const definition = schema ? schema[key as keyof L] : String;
+    for (const key of Object.keys(label) as (keyof L)[]) {
+      const definition: TransformFunc = schema ? schema[key] : String;
 
       let raw: string;
       if (isStream) {
@@ -112,12 +163,10 @@ export class Stdin {
         raw = this.read(prompt(label[key]));
       }
 
-      // R の制約により definition は必ず関数であることが保証されているが
-      // 念のため実行。Number(raw) や String(raw) がここで動く
-      result[key] = definition(raw);
+      result[key] = definition(raw) as string | ReturnType<S[keyof S]>;
     }
 
-    return result;
+    return result as { [K in keyof L]: string | ReturnType<S[keyof S]> };
   }
 
   public static objectWithZod<S extends z.ZodObject<any>>(
