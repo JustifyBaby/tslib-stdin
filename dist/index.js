@@ -35,17 +35,40 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Stdin = void 0;
 const fs = __importStar(require("fs"));
+const string_decoder_1 = require("string_decoder");
 const zod_1 = require("zod");
 class Stdin {
+    static READ_BUFFER_SIZE = 1024;
+    static pendingInput = "";
+    static takePendingLine() {
+        const newlineIndex = this.pendingInput.indexOf("\n");
+        if (newlineIndex === -1)
+            return undefined;
+        const line = this.pendingInput.slice(0, newlineIndex).replace(/\r$/, "");
+        this.pendingInput = this.pendingInput.slice(newlineIndex + 1);
+        return line;
+    }
+    static readLine() {
+        const decoder = new string_decoder_1.StringDecoder("utf8");
+        while (true) {
+            const pendingLine = this.takePendingLine();
+            if (pendingLine !== undefined)
+                return pendingLine;
+            const buffer = Buffer.alloc(this.READ_BUFFER_SIZE);
+            const bytesRead = fs.readSync(0, buffer, 0, this.READ_BUFFER_SIZE, null);
+            if (bytesRead === 0) {
+                const rest = this.pendingInput + decoder.end();
+                this.pendingInput = "";
+                return rest.replace(/\r$/, "");
+            }
+            this.pendingInput += decoder.write(buffer.subarray(0, bytesRead));
+        }
+    }
     /** * 1行読み込みのコアロジック
      */
     static read(prompt) {
         process.stdout.write(prompt);
-        const BUF_SIZE = 1024;
-        const buffer = Buffer.alloc(BUF_SIZE);
-        const bytesRead = fs.readSync(0, buffer, 0, BUF_SIZE, null);
-        // 改行を消して文字列を返す
-        return buffer.toString("utf8", 0, bytesRead).replace(/\r?\n$/, "");
+        return this.readLine();
     }
     static input(prompt) {
         return this.read(prompt);
@@ -58,7 +81,7 @@ class Stdin {
     static inputs(prompt, parser) {
         const raw = this.read(prompt);
         // スペースで分割し、空文字を除去
-        const items = raw.split(/\,|\;|\t|\||\s+/).filter((v) => v.length > 0);
+        const items = raw.split(/[,;\t|\s]+/).filter((v) => v.length > 0);
         if (!parser)
             return items;
         return items.map(parser);
@@ -68,7 +91,7 @@ class Stdin {
         const lines = [];
         let index = 0;
         while (true) {
-            const line = this.read("");
+            const line = this.readLine();
             if (end(line, index))
                 break;
             lines.push(line);
@@ -83,9 +106,8 @@ class Stdin {
      * オブジェクト形式での一括入力
      */
     static object(label, schema, prompt = (key) => `${key}: `, isStream = false, streamEnd = (line) => line === "") {
-        // 戻り値は関数の戻り値型に固定
         const result = {};
-        for (const key in label) {
+        for (const key of Object.keys(label)) {
             const definition = schema ? schema[key] : String;
             let raw;
             if (isStream) {
@@ -94,8 +116,6 @@ class Stdin {
             else {
                 raw = this.read(prompt(label[key]));
             }
-            // R の制約により definition は必ず関数であることが保証されているが
-            // 念のため実行。Number(raw) や String(raw) がここで動く
             result[key] = definition(raw);
         }
         return result;
