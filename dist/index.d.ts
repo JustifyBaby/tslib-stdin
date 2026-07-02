@@ -1,3 +1,4 @@
+import { z } from "zod";
 type PromptFunc = (key: string) => string;
 type TransformFunc<T = any> = (val: string) => T;
 export declare class Stdin {
@@ -13,13 +14,21 @@ export declare class Stdin {
     static inputs<T = string>(prompt: string, parser?: (v: string) => T): T[];
     static streamReads(prompt: string, end?: (line: string, index: number) => boolean): string[];
     static streamReadText(prompt: string, end?: (line: string, index: number) => boolean): string;
-    /**
-     * オブジェクト形式での一括入力
-     */
-    static object<S extends Record<string, string>, R extends {
-        [K in keyof S]: TransformFunc;
-    }>(schema: S, rule?: R, prompt?: PromptFunc): {
-        [K in keyof S]: ReturnType<R[K]>;
+    static object<L extends Record<string, string>, S extends {
+        [K in keyof L]: TransformFunc;
+    }>(label: L, schema?: S, prompt?: PromptFunc): {
+        [K in keyof S]: ReturnType<S[K]>;
     };
+    static object<L extends Record<string, string>, S extends {
+        [K in keyof L]: TransformFunc;
+    }>(label: L, schema?: S, prompt?: PromptFunc, isStream?: boolean, streamEnd?: (line: string, index: number) => boolean): {
+        [K in keyof L]: ReturnType<S[K]>;
+    };
+    static objectWithZod<S extends z.ZodObject<any>>(schema: S, label: {
+        [K in keyof z.infer<S>]: string;
+    }, prompt?: PromptFunc): z.ZodSafeParseResult<z.infer<S>>;
+    static objectWithZod<S extends z.ZodObject<any>>(schema: S, label: {
+        [K in keyof z.infer<S>]: string;
+    }, prompt?: PromptFunc, isStream?: boolean, streamEnd?: (line: string, index: number) => boolean): z.ZodSafeParseResult<z.infer<S>>;
 }
 export {};

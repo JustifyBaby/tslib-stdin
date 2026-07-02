@@ -1,3 +1,4 @@
+import z from "zod";
 import { Stdin } from "../src/index";
 /**
  * [Example 1] Basic Input
@@ -24,15 +25,15 @@ console.log("--- Object Schema ---");
 
 type Category = "Internal" | "External";
 
-// 1. Define the Schema (Labels for prompts)
-const schema = {
+// 1. Define the label (Labels for prompts)
+const label = {
   id: "Project ID",
   title: "Project Title",
   category: "Category (Internal/External)",
 };
 
 // 2. Define the Rules (Transformation functions)
-// All keys must match the schema exactly.
+// All keys must match the label exactly.
 const rules = {
   id: Number,
   title: String,
@@ -40,7 +41,7 @@ const rules = {
 };
 
 // 3. Execution
-const project = Stdin.object(schema, rules);
+const project = Stdin.object(label, rules);
 
 // Fully type-safe!
 console.log("\nProject Registered:");
@@ -65,3 +66,12 @@ console.log(multiLine);
 const multiLineText = Stdin.streamReadText("enter script >> ");
 
 console.log(multiLineText);
+
+const ruleWithZod = z.object({
+  id: z.number(),
+  title: z.string(),
+  category: z.enum(["Internal", "External"]),
+});
+
+const parsed = Stdin.objectWithZod(ruleWithZod, label);
+console.log(parsed);

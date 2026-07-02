@@ -35,6 +35,7 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Stdin = void 0;
 const fs = __importStar(require("fs"));
+const zod_1 = require("zod");
 class Stdin {
     /** * 1行読み込みのコアロジック
      */
@@ -42,7 +43,6 @@ class Stdin {
         process.stdout.write(prompt);
         const BUF_SIZE = 1024;
         const buffer = Buffer.alloc(BUF_SIZE);
-        // ts(2575) 回避のために 5引数で実行
         const bytesRead = fs.readSync(0, buffer, 0, BUF_SIZE, null);
         // 改行を消して文字列を返す
         return buffer.toString("utf8", 0, bytesRead).replace(/\r?\n$/, "");
@@ -82,18 +82,47 @@ class Stdin {
     /**
      * オブジェクト形式での一括入力
      */
-    static object(schema, rule, prompt) {
+    static object(label, schema, prompt = (key) => `${key}: `, isStream = false, streamEnd = (line) => line === "") {
         // 戻り値は関数の戻り値型に固定
-        prompt ??= (key) => `${key}: `;
         const result = {};
-        for (const key in schema) {
-            const definition = rule ? rule[key] : String;
-            const raw = this.read(prompt(schema[key]));
+        for (const key in label) {
+            const definition = schema ? schema[key] : String;
+            let raw;
+            if (isStream) {
+                raw = this.streamReadText(prompt(label[key]), streamEnd);
+            }
+            else {
+                raw = this.read(prompt(label[key]));
+            }
             // R の制約により definition は必ず関数であることが保証されているが
             // 念のため実行。Number(raw) や String(raw) がここで動く
             result[key] = definition(raw);
         }
         return result;
+    }
+    static objectWithZod(schema, label, prompt = (key) => `${key}: `, isStream = false, streamEnd = (line) => line === "") {
+        const result = {};
+        const labelKeys = Object.keys(schema.shape);
+        const schemaInto = {};
+        for (const labelSchemaKey of labelKeys) {
+            schemaInto[labelSchemaKey] = zod_1.z.string();
+        }
+        const parse = zod_1.z.object(schemaInto).safeParse(label);
+        if (!parse.success) {
+            throw new Error(zod_1.z.treeifyError(parse.error).errors.join("\n"));
+        }
+        for (const key in label) {
+            let raw;
+            if (isStream) {
+                raw = this.streamReadText(prompt(parse.data[key]), streamEnd);
+            }
+            else {
+                raw = this.read(prompt(parse.data[key]));
+            }
+            result[key] = raw;
+        }
+        // ZodのResult型を返す
+        return schema.safeParse(result);
     }
 }
 exports.Stdin = Stdin;

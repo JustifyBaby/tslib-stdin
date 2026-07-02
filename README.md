@@ -102,38 +102,87 @@ TypeScript
 
 ### `Stdin.input(prompt: string): string`
 
-Reads a single line from `stdin`.
+Reads a single line from `stdin` and returns it as a string.
 
-### `Stdin.inputs<T>(prompt: string, parser?: (v: string) => T): T[]`
+- `prompt`: Text written to `stdout` before reading.
+- Trailing newline (`\n` or `\r\n`) is removed from the returned value.
 
-Reads a line and splits it into an array.
+### `Stdin.inputs<T = string>(prompt: string, parser?: (v: string) => T): T[]`
 
-- **Default delimiters**: `,` `;` `\t` `|` and whitespace.
-- If `parser` is provided (e.g., `Number`), it maps each element.
+Reads one line, splits it into multiple values, and optionally transforms each value.
 
-### `Stdin.object(schema, rule, promptFunc?)`
+- `prompt`: Text written before reading.
+- `parser`: Optional transform function such as `Number` or a custom parser.
+- Split delimiters: comma, semicolon, tab, pipe, and whitespace.
+- Empty items are removed.
 
-Collects multiple inputs based on the `schema`.
+### `Stdin.streamReads(prompt: string, end?: (line: string, index: number) => boolean): string[]`
 
-- **schema**: `{ key: label }`. The `label` is used for the prompt display.
-- **rule**: `{ key: TransformFunc }`. Must match the keys in `schema`.
-- **promptFunc**: Optional. Customize how the prompt is displayed.
-  - Default: `(key) => `${key}: ` `
+Reads multiple lines from `stdin` until the end condition is met.
 
-### `Stdin.streamReads(prompt?: string): string[]`
+- `prompt`: Text written once before the multi-line input starts.
+- `end`: Optional predicate that stops input. Default: empty line (`line === ""`).
+- Returns the collected lines as `string[]`.
+- The terminating line is not included in the result.
 
-Reads multiple lines from `stdin`.
+### `Stdin.streamReadText(prompt: string, end?: (line: string, index: number) => boolean): string`
 
-- Returns each line as an element of a `string[]`.
-- Input ends when an empty line is entered.
+Reads multiple lines and returns them as a single string.
 
-### `Stdin.streamReadText(prompt?: string): string`
+- Uses `Stdin.streamReads(...)` internally.
+- Joins lines with `\n`.
+- `end` defaults to empty line (`line === ""`).
 
-Reads multiple lines from `stdin`.
+### `Stdin.object<L, S>(label: L, schema?: S, prompt?: (key: string) => string, isStream?: boolean, streamEnd?: (line: string, index: number) => boolean): { [K in keyof L]: ReturnType<S[K]> }`
 
-- Returns all input as a single `string`.
-- Lines are joined using `\n`.
-- Input ends when an empty line is entered.
+Collects values for each field in `label` and returns an object transformed by `schema`.
+
+- `label`: `{ key: promptLabel }`. Each value is passed to the prompt formatter.
+- `schema`: Optional transform map for each key. If omitted, values are converted with `String`.
+- `prompt`: Optional prompt formatter. Default: `(key) => \`${key}: \``.
+- `isStream`: If `true`, each field is read as multi-line text via `streamReadText`.
+- `streamEnd`: End condition used when `isStream` is `true`. Default: empty line.
+
+Example:
+
+```typescript
+const user = Stdin.object(
+  { id: "Employee ID", name: "Full Name" },
+  { id: Number, name: String },
+);
+```
+
+### `Stdin.objectWithZod<S extends z.ZodObject<any>>(schema: S, label: { [K in keyof z.infer<S>]: string }, prompt?: (key: string) => string, isStream?: boolean, streamEnd?: (line: string, index: number) => boolean): z.ZodSafeParseResult<z.infer<S>>`
+
+Collects raw string input for each field, then validates it with a Zod object schema.
+
+- `schema`: Zod object schema used for validation.
+- `label`: Prompt labels keyed by the same fields as the schema.
+- `prompt`: Optional prompt formatter. Default: `(key) => \`${key}: \``.
+- `isStream`: If `true`, each field is read as multi-line text.
+- `streamEnd`: End condition for multi-line mode. Default: empty line.
+- Returns the result of `schema.safeParse(...)`.
+
+Example:
+
+```typescript
+import { z } from "zod";
+
+const result = Stdin.objectWithZod(
+  z.object({
+    age: z.coerce.number().int().min(0),
+    name: z.string().min(1),
+  }),
+  {
+    age: "Age",
+    name: "Name",
+  },
+);
+
+if (result.success) {
+  console.log(result.data.age);
+}
+```
 
 ---
 

@@ -1,4 +1,5 @@
 import * as fs from "fs";
+import { z } from "zod";
 
 type PromptFunc = (key: string) => string;
 type TransformFunc<T = any> = (val: string) => T;
@@ -11,7 +12,6 @@ export class Stdin {
     const BUF_SIZE = 1024;
     const buffer = Buffer.alloc(BUF_SIZE);
 
-    // ts(2575) 回避のために 5引数で実行
     const bytesRead = fs.readSync(0, buffer, 0, BUF_SIZE, null);
 
     // 改行を消して文字列を返す
@@ -50,9 +50,7 @@ export class Stdin {
 
     while (true) {
       const line = this.read("");
-
       if (end(line, index)) break;
-
       lines.push(line);
       index++;
     }
@@ -67,26 +65,52 @@ export class Stdin {
     return this.streamReads(prompt, end).join("\n");
   }
 
+  public static object<
+    L extends Record<string, string>,
+    S extends { [K in keyof L]: TransformFunc }, // ここで関数以外を弾く
+  >(
+    label: L,
+    schema?: S,
+    prompt?: PromptFunc,
+  ): { [K in keyof S]: ReturnType<S[K]> };
+
+  public static object<
+    L extends Record<string, string>,
+    S extends { [K in keyof L]: TransformFunc }, // ここで関数以外を弾く
+  >(
+    label: L,
+    schema?: S,
+    prompt?: PromptFunc,
+    isStream?: boolean,
+    streamEnd?: (line: string, index: number) => boolean,
+  ): { [K in keyof L]: ReturnType<S[K]> };
+
   /**
    * オブジェクト形式での一括入力
    */
   public static object<
-    S extends Record<string, string>,
-    R extends { [K in keyof S]: TransformFunc }, // ここで関数以外を弾く
+    L extends Record<string, string>,
+    S extends { [K in keyof L]: TransformFunc }, // ここで関数以外を弾く
   >(
-    schema: S,
-    rule?: R,
-    prompt?: PromptFunc,
-  ): { [K in keyof S]: ReturnType<R[K]> } {
+    label: L,
+    schema?: S,
+    prompt: PromptFunc = (key) => `${key}: `,
+    isStream: boolean = false,
+    streamEnd: (line: string, index: number) => boolean = (line) => line === "",
+  ): { [K in keyof L]: ReturnType<S[K]> } {
     // 戻り値は関数の戻り値型に固定
-
-    prompt ??= (key) => `${key}: `;
 
     const result = {} as any;
 
-    for (const key in schema) {
-      const definition = rule ? rule[key as keyof S] : String;
-      const raw = this.read(prompt(schema[key]));
+    for (const key in label) {
+      const definition = schema ? schema[key as keyof L] : String;
+
+      let raw: string;
+      if (isStream) {
+        raw = this.streamReadText(prompt(label[key]), streamEnd);
+      } else {
+        raw = this.read(prompt(label[key]));
+      }
 
       // R の制約により definition は必ず関数であることが保証されているが
       // 念のため実行。Number(raw) や String(raw) がここで動く
@@ -94,5 +118,55 @@ export class Stdin {
     }
 
     return result;
+  }
+
+  public static objectWithZod<S extends z.ZodObject<any>>(
+    schema: S,
+    label: { [K in keyof z.infer<S>]: string },
+    prompt?: PromptFunc,
+  ): z.ZodSafeParseResult<z.infer<S>>;
+
+  public static objectWithZod<S extends z.ZodObject<any>>(
+    schema: S,
+    label: { [K in keyof z.infer<S>]: string },
+    prompt?: PromptFunc,
+    isStream?: boolean,
+    streamEnd?: (line: string, index: number) => boolean,
+  ): z.ZodSafeParseResult<z.infer<S>>;
+
+  public static objectWithZod<S extends z.ZodObject<any>>(
+    schema: S,
+    label: { [K in keyof z.infer<S>]: string },
+    prompt: PromptFunc = (key) => `${key}: `,
+    isStream: boolean = false,
+    streamEnd: (line: string, index: number) => boolean = (line) => line === "",
+  ): z.ZodSafeParseResult<z.infer<S>> {
+    const result: Record<any, any> = {};
+
+    const labelKeys = Object.keys(schema.shape);
+    const schemaInto: Record<string, z.ZodString> = {};
+    for (const labelSchemaKey of labelKeys) {
+      schemaInto[labelSchemaKey] = z.string();
+    }
+
+    const parse = z.object(schemaInto).safeParse(label);
+
+    if (!parse.success) {
+      throw new Error(z.treeifyError(parse.error).errors.join("\n"));
+    }
+
+    for (const key in label) {
+      let raw: string;
+      if (isStream) {
+        raw = this.streamReadText(prompt(parse.data[key]), streamEnd);
+      } else {
+        raw = this.read(prompt(parse.data[key]));
+      }
+
+      result[key] = raw;
+    }
+
+    // ZodのResult型を返す
+    return schema.safeParse(result);
   }
 }
